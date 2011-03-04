@@ -78,8 +78,10 @@ sub _make_path {
 
     my @path    = (
         @{ $self->[ ROOT_SPLIT_PATH ] },
-        $is_abs ? () : @{$self->[ CUR_PATH ] },
-        @sp
+        _del_dots(
+            $is_abs ? () : @{$self->[ CUR_PATH ] },
+            @sp
+        )
     );
 
     File::Spec->catdir( @path );
@@ -95,11 +97,6 @@ sub _del_dots {
         elsif ( $_ ne '.' ) {
             push @_l, $_;
         }
-    }
-
-    my $root = File::Spec->rootdir;
-    if ( $_l[0] ne $root ) {
-        unshift @_l, $root;
     }
 
     return @_l;
