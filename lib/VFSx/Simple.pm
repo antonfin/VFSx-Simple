@@ -25,11 +25,6 @@ sub new {
     return bless [ $path, \@sp, [ File::Spec->rootdir() ] ] => $class;
 }
 
-sub cwd {
-    my ( $self ) = @_;
-    File::Spec->catdir( @{ $self->[ CUR_PATH ] } );
-}
-
 sub chdir {
     my ($self, $path) = @_;
 
@@ -44,13 +39,26 @@ sub chdir {
 
     $err = qq/Path $path doesn't exist/;
 
-    return undef;
+    undef
+}
+
+sub cwd {
+    File::Spec->catdir( @{ shift->[ CUR_PATH ] } );
 }
 
 sub mkdir {
     my ($self, $path, $mask) = @_;
-    mkdir( $self->_make_path( $path ), $mask );
+
+    return 1 if defined $mask
+            ? CORE::mkdir( $self->_make_path( $path ), $mask )
+            : CORE::mkdir( $self->_make_path( $path ) );
+    
+    $err = $!;
+    
+    undef
 }
+
+sub root { shift->[ ROOT_PATH ] }
 
 sub _make_path {
     my ($self, $path) = @_;
@@ -60,7 +68,7 @@ sub _make_path {
 
     my @path    = (
         @{ $self->[ ROOT_SPLIT_PATH ] },
-        $is_abs ? @{$self->[ CUR_PATH ] } : (),
+        $is_abs ? () : @{$self->[ CUR_PATH ] },
         @sp
     );
 
