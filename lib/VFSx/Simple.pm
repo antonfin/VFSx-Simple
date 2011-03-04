@@ -9,7 +9,7 @@ our $VERSION = 0.1;
 
 my $err;
 
-sub error { $err } 
+sub error { $err }
 
 sub ROOT_PATH()         { 0 }
 sub ROOT_SPLIT_PATH()   { 1 }
@@ -17,10 +17,10 @@ sub CUR_PATH()          { 2 }
 
 sub new {
     my ($class, $path) = @_;
-    
-    die "Path $path must be absolute\n" 
+
+    die "Path $path must be absolute\n"
         unless File::Spec->file_name_is_absolute( $path );
-    
+
     my @sp = File::Spec->splitdir($path);
     return bless [ $path, \@sp, [ File::Spec->rootdir() ] ] => $class;
 }
@@ -52,9 +52,19 @@ sub mkdir {
     return 1 if defined $mask
             ? CORE::mkdir( $self->_make_path( $path ), $mask )
             : CORE::mkdir( $self->_make_path( $path ) );
-    
+
     $err = $!;
-    
+
+    undef
+}
+
+sub rmdir {
+    my ($self, $path, $mask) = @_;
+
+    return 1 if CORE::rmdir( $self->_make_path( $path ) );
+
+    $err = $!;
+
     undef
 }
 
@@ -75,13 +85,33 @@ sub _make_path {
     File::Spec->catdir( @path );
 }
 
+sub _del_dots {
+    my @list = @_;
+    my @_l;
+    for ( @list ) {
+        if ( $_ eq '..' ) {
+            pop @_l 
+        }
+        elsif ( $_ ne '.' ) {
+            push @_l, $_;
+        }
+    }
+
+    my $root = File::Spec->rootdir;
+    if ( $_l[0] ne $root ) {
+        unshift @_l, $root;
+    }
+
+    return @_l;
+}
+
 1;
 
 __END__
 
 =head1 NAME
 
-VFSx::Simple - 
+VFSx::Simple -
 
 =head1 VERSION
 
