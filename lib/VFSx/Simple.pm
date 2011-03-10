@@ -88,6 +88,23 @@ sub mkdir {
     undef
 }
 
+# returns the value of a symbolic link
+sub readlink {
+    my ($self, $symlink) = @_;
+
+    my $r_symlink = $self->_make_path( $symlink );
+
+    unless ( -l $r_symlink ) {
+        $err = "$symlink is not symbolic link";
+        return undef;
+    }
+
+    my @path = File::Spec->splitdir( CORE::readlink( $r_symlink ) );
+    splice( @path, 0, scalar( @{$self->[ ROOT_SPLIT_PATH ]} ));
+    
+    File::Spec->catdir( File::Spec->rootdir, @path );
+}
+
 # delete directory
 sub rmdir {
     my ($self, $path, $mask) = @_;
@@ -208,9 +225,9 @@ from Fuse package hooks
     rmdir       - OK
     setxattr
     statfs
-    symlink
+    symlink     - OK
     truncate
-    unlink
+    unlink      - OK
     utime
     write
 
@@ -250,6 +267,14 @@ Create new directory
         else {
             die q|Coudn't create new folder /tmp/test. Error [| . $vfs->error . "]\n";
         }
+=head2 readlink
+
+Returns the value of a symbolic link
+
+        print "Link $link -> " . $vfs->readlink( $link ) . "\n";
+
+    NOTE! All symlinks created like absolut symlinks. And readlink method was returned absolut
+    virtual symlink
 
 =head2 rename
 
@@ -283,6 +308,7 @@ Creates a new filename symbolically linked to the old filename
         $vfs->symlink('/home/test/script.sh', '/etc/init.d/bla-bla' )
             or die q|Coudn't create symlink. Error [| . $vfs->error . "]\n";
 
+    NOTE! All symlinks created like absolut symlinks
 
 =head2 unlink
 
@@ -297,5 +323,4 @@ Delete file
     All rights reserved.
 
 =cut
-
 
