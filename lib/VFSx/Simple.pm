@@ -4,6 +4,9 @@ use strict;
 use warnings;
 
 use File::Spec;
+use File::Copy ();;
+use File::Path ();
+use IO::File;
 
 our $VERSION = 0.01;
 
@@ -21,12 +24,15 @@ sub CUR_PATH()          { 2 }
 sub new {
     my ($class, $path) = @_;
 
+    $path =~ s|[\\/]$||;
+
     die "Path $path must be absolute\n"
         unless File::Spec->file_name_is_absolute( $path );
 
     my @sp = File::Spec->splitdir($path);
     return bless [ $path, \@sp, [ File::Spec->rootdir() ] ] => $class;
 }
+
 
 # change directory method
 sub chdir {
@@ -46,16 +52,62 @@ sub chdir {
     undef
 }
 
+# Changes the permissions of a list of files
+sub chmod {
+    my ($self, $mode) = (shift, shift);
+    
+    return 1 if CORE::chmod $mode, map { $self->_make_path( $_ ) } @_;
+
+    $err = $!;
+     
+    undef
+}
+
+# changes the owner (and group) of a list of file)
+sub chown {
+    my ($self, $uid, $gid) = (shift, shift, shift);
+    
+    return 1 if CORE::chown $uid, $gid, map { $self->_make_path( $_ ) } @_;
+
+    $err = $!;
+     
+    undef
+}
+
+# copy files
+sub copy {
+    my ( $self, $old_file, $new_file ) = @_;
+    File::Copy::copy( _make_path($old_file), _make_path($new_file));
+}
+
+# move files
+sub move {
+    my ( $self, $old_file, $new_file ) = @_;
+    File::Copy::move( _make_path($old_file), _make_path($new_file));
+}
+
 # return current directory
 sub cwd {
     File::Spec->catdir( @{ shift->[ CUR_PATH ] } );
 }
 
+# glob analog
+sub glob {
+    my ($self, $path ) = @_;
+    my $r_path = $self->_make_path( $path );
+    
+    my $root = $self->[ ROOT_PATH ];
+    my @elements = map { s/^$root// } CORE::glob( "$r_path/*" );
+
+    return @elements;
+}
+
+
 # creates a new filename linked to the old filename
 sub link {
     my ($self, $old_file, $new_file) = @_;
 
-    return 1 if 
+    return 1 if
         CORE::link $self->_make_path( $old_file ), $self->_make_path( $new_file );
 
     $err = $!;
@@ -63,17 +115,6 @@ sub link {
     undef
 }
 
-# rename files or folders
-sub rename {
-    my ($self, $old_path, $new_path) = @_;
-
-    return 1 if 
-        rename $self->_make_path( $old_path ), $self->_make_path( $new_path );
-
-    $err = $!;
-
-    undef
-}
 
 # create new directory
 sub mkdir {
@@ -86,6 +127,36 @@ sub mkdir {
     $err = $!;
 
     undef
+}
+
+# create new directory recursive
+sub mkpath {
+    my ( $self, $dir, $mask ) = @_;
+    my $r_path = _make_path( $dir );
+    if ( $mask ) {
+        File::Path::mkpath( $r_path, 1, $mask );
+    } else {
+        File::Path::mkpath( $r_path, 1, $mask );
+    }
+}
+
+# open file
+sub open {
+    my ( $self, $file, $mode ) = @_;
+    
+    my $file_path = $self->_make_path( $file );
+    unless ( -f $file_path ) {
+        $err = qq/Error $file is not file./;
+        return undef
+    }
+
+    IO::File->new( $file, $mode );
+}
+
+# return directory contains
+sub readdir {
+    my ( $self, $dir ) = @_;
+    CORE::readdir( $self->_make_path($dir) );
 }
 
 # returns the value of a symbolic link
@@ -101,8 +172,20 @@ sub readlink {
 
     my @path = File::Spec->splitdir( CORE::readlink( $r_symlink ) );
     splice( @path, 0, scalar( @{$self->[ ROOT_SPLIT_PATH ]} ));
-    
+
     File::Spec->catdir( File::Spec->rootdir, @path );
+}
+
+# rename files or folders
+sub rename {
+    my ($self, $old_path, $new_path) = @_;
+
+    return 1 if
+        rename $self->_make_path( $old_path ), $self->_make_path( $new_path );
+
+    $err = $!;
+
+    undef
 }
 
 # delete directory
@@ -116,14 +199,26 @@ sub rmdir {
     undef
 }
 
+# recursive delete
+sub rmtree {
+    my ($self, $path) = @_;
+    File::Path::rmtree( _make_path( $path ) );
+}
+
 # return root folder
 sub root { shift->[ ROOT_PATH ] }
+
+# return file information
+sub stat {
+    my ($self, $path) = @_;
+    return CORE::stat( _make_path( $path ) );
+}
 
 # creates a new filename symbolically linked to the old filename
 sub symlink {
     my ($self, $old_file, $new_file) = @_;
 
-    return 1 if 
+    return 1 if
         CORE::symlink $self->_make_path( $old_file ), $self->_make_path( $new_file );
 
     $err = $!;
@@ -141,6 +236,48 @@ sub unlink {
     $err = $!;
 
     undef
+}
+
+# -X emulator,  $vfs->X( qw|-f /tmp/test.pl| );
+#               $vfs->X('-d', '/tmp/test');
+sub X {
+    my ( $self, $flag, $path ) = @_;
+    
+    for ( $flag ) {
+        return -r $self->_make_path( $path ) if /r/;
+        return -w $self->_make_path( $path ) if /w/;
+        return -x $self->_make_path( $path ) if /x/;
+        return -o $self->_make_path( $path ) if /o/;
+
+        return -R $self->_make_path( $path ) if /R/;
+        return -W $self->_make_path( $path ) if /W/;
+        return -X $self->_make_path( $path ) if /X/;
+        return -O $self->_make_path( $path ) if /O/;
+        
+        return -e $self->_make_path( $path ) if /e/;
+        return -z $self->_make_path( $path ) if /z/;
+        return -s $self->_make_path( $path ) if /s/;
+
+        return -f $self->_make_path( $path ) if /f/;
+        return -d $self->_make_path( $path ) if /d/;
+        return -l $self->_make_path( $path ) if /l/;
+        return -p $self->_make_path( $path ) if /p/;
+        return -S $self->_make_path( $path ) if /S/;
+        return -b $self->_make_path( $path ) if /b/;
+        return -c $self->_make_path( $path ) if /c/;
+        return -t $self->_make_path( $path ) if /t/;
+
+        return -u $self->_make_path( $path ) if /u/;
+        return -g $self->_make_path( $path ) if /g/;
+        return -k $self->_make_path( $path ) if /k/;
+
+        return -T $self->_make_path( $path ) if /T/;
+        return -B $self->_make_path( $path ) if /B/;
+
+        return -M $self->_make_path( $path ) if /M/;
+        return -A $self->_make_path( $path ) if /A/;
+        return -C $self->_make_path( $path ) if /C/;
+    }
 }
 
 ###########################         Utils
@@ -169,7 +306,7 @@ sub _del_dots {
     my @_l;
     for ( @list ) {
         if ( $_ eq '..' ) {
-            pop @_l 
+            pop @_l
         }
         elsif ( $_ ne '.' ) {
             push @_l, $_;
@@ -204,32 +341,11 @@ use VFSx::Simple;
 =head1 METHODS
 
 from Fuse package hooks
-    chmod
-    chown
-    flush
-    fsync
-    getattr
-    getdir
-    getxattr
-    link        - OK
-    listxattr
-    mkdir       - OK
-    mknod
-    open
-    read
-    readdir
-    readlink
-    release
-    removexattr 
-    rename      - OK
-    rmdir       - OK
-    setxattr
-    statfs
-    symlink     - OK
-    truncate
-    unlink      - OK
-    utime
-    write
+
+    copy
+    mkpath
+    move
+    rmtree
 
 =head2 cwd
 
@@ -243,13 +359,25 @@ Change current directory. Shell analog.
 
         # for unix system
         # was default '/' current folder
-        
+
         print $vfs->cwd . "\n";     # was printed '/';
-        
+
         $vfs->chdir( '/tmp' );
-        
+
         # now /tmp - current directory
         print $vfs->cwd . "\n";     # was printed '/tmp';
+
+=head2 chmod
+
+Changes permissions of a list of files
+
+        $vfs->chmod( 0755, 'test1.txt', 'test2.txt' );
+
+=head2 chown
+
+Changes the owner (and group) of a list of file)
+
+        $vfs->chown( 1000, 1000, 'test1.txt', 'test2.txt' );
 
 =head2 link
 
@@ -267,6 +395,14 @@ Create new directory
         else {
             die q|Coudn't create new folder /tmp/test. Error [| . $vfs->error . "]\n";
         }
+
+=head2 open
+
+Get file name and mode and return IO::File object
+
+        my $io = $vfs->open( "/tmp/test.txt" );
+        print $io->getc;
+
 =head2 readlink
 
 Returns the value of a symbolic link
@@ -279,7 +415,7 @@ Returns the value of a symbolic link
 =head2 rename
 
 Rename files or directories
-        
+
         if ( $vfs->rename('/tmp/test/file.txt', '/tmp/test/old.file.txt') ) {
             print "File /tmp/test/file.txt was succesfully renamed to '/tmp/test/old.file.txt'\n";
         }
@@ -301,6 +437,13 @@ Delete directory
             die q|Coudn't delte folder /tmp/test. Error [| . $vfs->error . "]\n";
         }
 
+=head stat
+
+Returns a 13-element list giving the status info for a file
+
+        my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, 
+            $mtime, $ctime, $blksize, $blocks) = $vsf->stat( "/tmp/path" ); 
+
 =head2 symlink
 
 Creates a new filename symbolically linked to the old filename
@@ -314,8 +457,19 @@ Creates a new filename symbolically linked to the old filename
 
 Delete file
 
-        $vfs->unlink("/tmp/test/file.txt") ) 
+        $vfs->unlink("/tmp/test/file.txt") )
             or die q|Coudn't delte file /tmp/test/file.txt. Error [| . $vfs->error . "]\n";
+
+=head2 X
+
+Emulator for -X logic
+
+see perldoc -f -X
+
+        $vfs->X('-f', $path);
+        $vfs->X('-d', $path);
+        $vfs->X('-s', $path);
+        # etc...
 
 =head1 LICENSE AND COPYRIGHT
 

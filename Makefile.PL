@@ -10,8 +10,9 @@ WriteMakefile(
     LICENSE     => 'artistic_2',
     test        => { TESTS => 't/*.t' },
     PREREQ_PM => {
-        'File::Spec' => 0,
-        'FindBin'    => 0,
+        'File::Spec'    => 0,
+        'FindBin'       => 0,
+        'IO::File'      => 0,
     }
 );
 
