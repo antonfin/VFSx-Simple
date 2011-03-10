@@ -51,6 +51,18 @@ sub cwd {
     File::Spec->catdir( @{ shift->[ CUR_PATH ] } );
 }
 
+# creates a new filename linked to the old filename
+sub link {
+    my ($self, $old_file, $new_file) = @_;
+
+    return 1 if 
+        CORE::link $self->_make_path( $old_file ), $self->_make_path( $new_file );
+
+    $err = $!;
+
+    undef
+}
+
 # rename files or folders
 sub rename {
     my ($self, $old_path, $new_path) = @_;
@@ -90,6 +102,20 @@ sub rmdir {
 # return root folder
 sub root { shift->[ ROOT_PATH ] }
 
+# creates a new filename symbolically linked to the old filename
+sub symlink {
+    my ($self, $old_file, $new_file) = @_;
+
+    return 1 if 
+        CORE::symlink $self->_make_path( $old_file ), $self->_make_path( $new_file );
+
+    $err = $!;
+
+    undef
+
+}
+
+# unlink file
 sub unlink {
     my ( $self, $file ) = @_;
 
@@ -100,10 +126,9 @@ sub unlink {
     undef
 }
 
-#
 ###########################         Utils
 #
-# utils. Create virtual directory name
+# create virtual directory name
 sub _make_path {
     my ($self, $path) = @_;
 
@@ -169,7 +194,7 @@ from Fuse package hooks
     getattr
     getdir
     getxattr
-    link
+    link        - OK
     listxattr
     mkdir       - OK
     mknod
@@ -209,6 +234,12 @@ Change current directory. Shell analog.
         # now /tmp - current directory
         print $vfs->cwd . "\n";     # was printed '/tmp';
 
+=head2 link
+
+Create new link
+
+        $vfs->link( '/tmp/test/file.txt', '/tmp/test/link-by-file.txt' ) or die "Can't create link\n";
+
 =head2 mkdir
 
 Create new directory
@@ -244,6 +275,14 @@ Delete directory
         else {
             die q|Coudn't delte folder /tmp/test. Error [| . $vfs->error . "]\n";
         }
+
+=head2 symlink
+
+Creates a new filename symbolically linked to the old filename
+
+        $vfs->symlink('/home/test/script.sh', '/etc/init.d/bla-bla' )
+            or die q|Coudn't create symlink. Error [| . $vfs->error . "]\n";
+
 
 =head2 unlink
 
