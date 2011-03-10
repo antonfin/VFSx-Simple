@@ -90,6 +90,19 @@ sub rmdir {
 # return root folder
 sub root { shift->[ ROOT_PATH ] }
 
+sub unlink {
+    my ( $self, $file ) = @_;
+
+    return 1 if CORE::unlink( $self->_make_path( $file ) );
+
+    $err = $!;
+
+    undef
+}
+
+#
+###########################         Utils
+#
 # utils. Create virtual directory name
 sub _make_path {
     my ($self, $path) = @_;
@@ -166,7 +179,7 @@ from Fuse package hooks
     readlink
     release
     removexattr 
-    rename
+    rename      - OK
     rmdir       - OK
     setxattr
     statfs
@@ -207,6 +220,20 @@ Create new directory
             die q|Coudn't create new folder /tmp/test. Error [| . $vfs->error . "]\n";
         }
 
+=head2 rename
+
+Rename files or directories
+        
+        if ( $vfs->rename('/tmp/test/file.txt', '/tmp/test/old.file.txt') ) {
+            print "File /tmp/test/file.txt was succesfully renamed to '/tmp/test/old.file.txt'\n";
+        }
+
+        # or
+
+        if ( $vfs->chdir('/tmp/test') and $vfs->rename('file.txt', 'old.file.txt') ) {
+            print "File file.txt was succesfully renamed to 'old.file.txt'\n";
+        }
+
 =head2 rmdir
 
 Delete directory
@@ -217,6 +244,13 @@ Delete directory
         else {
             die q|Coudn't delte folder /tmp/test. Error [| . $vfs->error . "]\n";
         }
+
+=head2 unlink
+
+Delete file
+
+        $vfs->unlink("/tmp/test/file.txt") ) 
+            or die q|Coudn't delte file /tmp/test/file.txt. Error [| . $vfs->error . "]\n";
 
 =head1 LICENSE AND COPYRIGHT
 
