@@ -77,13 +77,13 @@ sub chown {
 # copy files
 sub copy {
     my ( $self, $old_file, $new_file ) = @_;
-    File::Copy::copy( _make_path($old_file), _make_path($new_file));
+    File::Copy::copy($self->_make_path($old_file), $self->_make_path($new_file));
 }
 
 # move files
 sub move {
     my ( $self, $old_file, $new_file ) = @_;
-    File::Copy::move( _make_path($old_file), _make_path($new_file));
+    File::Copy::move($self->_make_path($old_file), $self->_make_path($new_file));
 }
 
 # return current directory
@@ -132,7 +132,7 @@ sub mkdir {
 # create new directory recursive
 sub mkpath {
     my ( $self, $dir, $mask ) = @_;
-    my $r_path = _make_path( $dir );
+    my $r_path = $self->_make_path( $dir );
     if ( $mask ) {
         File::Path::mkpath( $r_path, 1, $mask );
     } else {
@@ -202,7 +202,7 @@ sub rmdir {
 # recursive delete
 sub rmtree {
     my ($self, $path) = @_;
-    File::Path::rmtree( _make_path( $path ) );
+    File::Path::rmtree( $self->_make_path( $path ) );
 }
 
 # return root folder
@@ -211,7 +211,7 @@ sub root { shift->[ ROOT_PATH ] }
 # return file information
 sub stat {
     my ($self, $path) = @_;
-    return CORE::stat( _make_path( $path ) );
+    return CORE::stat( $self->_make_path( $path ) );
 }
 
 # creates a new filename symbolically linked to the old filename
@@ -285,8 +285,8 @@ sub X {
 # create virtual directory name
 sub _make_path {
     my ($self, $path) = @_;
-
     my @sp      = File::Spec->splitdir( $path );
+    
     my $is_abs  = File::Spec->file_name_is_absolute( $path );
 
     my @path    = (
@@ -302,7 +302,7 @@ sub _make_path {
 
 # delete dots ('.' and '..') directory name's from path list
 sub _del_dots {
-    my @list = @_;
+    my @list = grep { length } @_;
     my @_l;
     for ( @list ) {
         if ( $_ eq '..' ) {
@@ -312,7 +312,7 @@ sub _del_dots {
             push @_l, $_;
         }
     }
-
+    
     return @_l;
 }
 

@@ -6,7 +6,8 @@ use warnings;
 use FindBin qw/$Bin/;
 use File::Path 'rmtree';
 
-my $v_path = "$Bin/tmp";
+#my $v_path = "$Bin/tmp";
+my $v_path = "/tmp/VFS";
 
 # init
 sub init {
@@ -45,6 +46,12 @@ sub init {
         unless -f "$v_path/text5.txt";
 
     close $fh or die $! if $fh;
+
+    open ( $fh, '>', "$v_path/test1/text6.txt" ) or die $! 
+        unless -f "$v_path/test1/text6.txt";
+
+    close $fh or die $! if $fh;
+
 
     return $v_path;
 }
